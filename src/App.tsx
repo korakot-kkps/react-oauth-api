@@ -32,55 +32,93 @@ const initUser: userResponseData = {
 };
 
 function App() {
-  const [username, setUsername] = useState<string>("");
-  const [password, setPassword] = useState<string>("");
+  const [username, setUsername] = useState<string>("lonlekor");
+  const [password, setPassword] = useState<string>("7hailand_8");
+  const [otp, setOTP] = useState<string>("");
   const [authResponse, setAuthResponse] = useState<authResponseData>(initAuth);
-  const [userResponse, setUserResponse] = useState<userResponseData>(initUser);  
+  const [userResponse, setUserResponse] = useState<userResponseData>(initUser);
 
-  const handleLogin = useCallback(() => {
-    axios
-      .request<authResponseData>({
-        method: "post",
-        url: "https://localhost:44384/api/auth",
-        data: {
-          grant_type: "password",
-          username: username,
-          password: password,
-          role: "user", //custom parameter
-        },
-        headers: {
-          "Content-Type": "application/x-www-form-urlencoded",
-          "Cache-Control": "no-cache",
-          "Accepted-Language": "TH",
-        },
-      })
-      .then(function (response) {
-        setAuthResponse(response.data);
-        setUserResponse({ ...userResponse, isAuthorized: true });
-          sessionStorage.setItem(
-            "access_token",
-            authResponse.access_token
-          );
-      })
-      .catch(function (error) {
-        console.log("Post Error : " + error);
-      });
-  }, [authResponse.access_token, password, userResponse, username]);
+  const handleLogin = useCallback(
+    (loginRole: string) => {
+      axios
+        .request<authResponseData>({
+          method: "post",
+          url: "https://localhost:44323/api/v1/auth",
+          data: {
+            grant_type: "password",
+            username: username,
+            password: password,
+            role: loginRole, //custom parameter
+            company:"phatra",
+          },
+          headers: {
+            "Content-Type": "application/x-www-form-urlencoded",
+            "Cache-Control": "no-cache",
+            "Accepted-Language": "TH",
+          },
+        })
+        .then(function (response) {
+          setAuthResponse(response.data);
+          setUserResponse({ ...userResponse, isAuthorized: true });
+          sessionStorage.setItem("access_token", response.data.access_token);
+        })
+        .catch(function (error) {
+          console.log("Post Error : " + error);
+        });
+    },
+    [password, userResponse, username]
+  );
 
-  const handleGetOTP = useCallback(() => {
+  const handleRequestOTP = useCallback(() => {
     axios
       .request<userResponseData>({
         headers: {
-          Authorization: `Bearer ${authResponse?.access_token === "" ? authResponse?.access_token : sessionStorage.getItem("access_token") }`,
+          Authorization: `Bearer ${sessionStorage.getItem("access_token")}`,
         },
         method: "GET",
-        url: `https://localhost:44384/api/otp-get`,
+        url: `https://localhost:44323/api/v1/otp-request/`,
       })
       .then((response) => {
         // console.log(response.data);
         setUserResponse(response.data);
       });
-  }, [authResponse?.access_token]);
+  }, []);
+
+  const handleSubmitOTP = useCallback(
+    async (event: React.FormEvent<HTMLFormElement>) => {
+      event.preventDefault();
+      console.log(otp);
+      axios
+        .request({
+          headers: {
+            Authorization: `Bearer ${sessionStorage.getItem("access_token")}`,
+          },
+          method: "post",
+          url: `https://localhost:44323/api/v1/otp-submit`,
+          data: { OTP: otp },
+        })
+        .then((response) => {
+          // console.log(response.data);
+          console.log("OTP is valid");
+        });
+    },
+    [otp]
+  );
+
+  const handleLogout = useCallback(async () => {
+    axios
+      .request<userResponseData>({
+        headers: {
+          Authorization: `Bearer ${sessionStorage.getItem("access_token")}`,
+        },
+        method: "get",
+        url: `https://localhost:44323/api/v1/logout`,
+      })
+      .then((response) => {
+        sessionStorage.removeItem("access_token");
+        console.log("logged off");
+      });
+  }, []);
 
   return (
     <div className="App" style={{ margin: 30 }}>
@@ -101,9 +139,9 @@ function App() {
         <tr>
           <td width={100}>username : </td>
           <td>
-            {" "}
             <input
               type="text"
+              value={username}
               onChange={(e) => setUsername(e.target.value)}
             ></input>
           </td>
@@ -112,7 +150,8 @@ function App() {
           <td>password : </td>
           <td>
             <input
-              type="text"
+              type="password"
+              value={password}
               onChange={(e) => setPassword(e.target.value)}
             ></input>
           </td>
@@ -123,9 +162,18 @@ function App() {
               type="button"
               style={{ width: "100px" }}
               onClick={() => {
-                handleLogin();
+                handleLogin("admin");
               }}
-              value={"Login"}
+              value={"Login as Admin"}
+            ></input>
+            &nbsp;&nbsp;
+            <input
+              type="button"
+              style={{ width: "100px" }}
+              onClick={() => {
+                handleLogin("user");
+              }}
+              value={"Login as User"}
             ></input>
           </td>
         </tr>
@@ -138,12 +186,51 @@ function App() {
           </td>
         </tr>
         <tr>
-          <td width={100}>OTP : </td>
+          <td colSpan={1} align="right">
+            <input
+              type="button"
+              style={{ width: "100px" }}
+              onClick={() => {
+                handleRequestOTP();
+              }}
+              value={"Get OTP"}
+            ></input>
+          </td>
+        </tr>
+        <tr>
+          <td width={100}>Confirm OTP : </td>
           <td>
             <input
               type="text"
-              onChange={(e) => setUsername(e.target.value)}
+              value={otp}
+              onChange={(e) => setOTP(e.target.value)}
             ></input>
+          </td>
+        </tr>
+        <tr>
+          <td></td>
+          <td colSpan={1} align="right">
+            <form id="formOTP" onSubmit={handleSubmitOTP}>
+              <input
+                type="submit"
+                name="OTP"
+                style={{ width: "100px" }}
+                onClick={(e) => {
+                  // e.preventDefault();
+                }}
+                value={"Submit OTP"}
+              ></input>
+            </form>
+          </td>
+        </tr>
+      </table>
+
+      {userResponse.isAuthorized ? <div></div> : <div></div>}
+
+      <table>
+        <tr>
+          <td colSpan={2} align="left">
+            <b>Test Logout</b>
           </td>
         </tr>
         <tr>
@@ -152,15 +239,65 @@ function App() {
               type="button"
               style={{ width: "100px" }}
               onClick={() => {
-                handleGetOTP();
+                handleLogout();
               }}
-              value={"Confirm"}
+              value={"Logout"}
             ></input>
           </td>
         </tr>
       </table>
 
-      {userResponse.isAuthorized ? <div></div> : <div></div>}
+      <table>
+        <tr>
+          <td colSpan={2} align="left">
+            <b>Sales Portal - API Call</b>
+          </td>
+        </tr>
+        <tr>
+          <td colSpan={2} align="right">
+            <input
+              type="button"
+              style={{ width: "100%" }}
+              onClick={() => {
+                axios
+                  .request<userResponseData>({
+                    headers: {
+                      Authorization: `Bearer ${sessionStorage.getItem(
+                        "access_token"
+                      )}`,
+                    },
+                    method: "get",
+                    url: `https://localhost:44323/api/v1/announcers-list`,
+                  })
+                  .then((response) => {});
+              }}
+              value={"api/v1/announcers-list"}
+            ></input>
+          </td>
+        </tr>
+        <tr>
+          <td colSpan={2} align="right">
+            <input
+              type="button"
+              style={{ width: "100%" }}
+              onClick={() => {
+                axios
+                  .request<userResponseData>({
+                    headers: {
+                      Authorization: `Bearer ${sessionStorage.getItem(
+                        "access_token"
+                      )}`,
+                    },
+                    method: "get",
+                    url: `https://localhost:44323/api/admin/v1/announcers-list`,
+                  })
+                  .then((response) => {});
+              }}
+              value={"api/admin/v1/announcers-list"}
+            ></input>
+          </td>
+        </tr>
+      </table>
     </div>
   );
 }
